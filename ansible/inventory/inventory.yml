@@ -1,0 +1,6 @@
+bastion_hosts:
+  hosts:
+    bastion-qa:
+      ansible_host: 54.85.121.209
+      ansible_user: ubuntu
+

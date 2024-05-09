@@ -1,0 +1,39 @@
+---
+- name: Create schema and tables in RDS instance
+  hosts: backend
+  become: yes
+
+  tasks:
+    - name: Install MySQL client
+      package:
+        name: mysql-client
+        state: present
+
+    - name: Check if database exists
+      shell: |
+        mysql -h mysql-database-qa.crqm4uyeoi50.us-east-1.rds.amazonaws.com -u admin -p applicationuser -e "SHOW DATABASES" | grep -q 'database-'
+      ignore_errors: yes
+      register: db_exists_result
+
+    - name: Create database if it doesn't exist
+      shell: |
+        mysql -h mysql-database-qa.crqm4uyeoi50.us-east-1.rds.amazonaws.com -u admin -p applicationuser -e "CREATE DATABASE database-qa"
+      environment:
+        MYSQL_PWD: "{{ db_password }}"
+      when: db_exists_result.rc != 0
+
+    - name: Create tables
+      shell: |
+        mysql -h mysql-database-qa.crqm4uyeoi50.us-east-1.rds.amazonaws.com -u admin -p applicationuser database-qa -e "{{ item }}"
+      environment:
+        MYSQL_PWD: "applicationuser"
+      loop:
+        - "CREATE TABLE publications (indexes INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(250), avatar VARCHAR(250))"
+        - "CREATE TABLE reviewers (indexes INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(250), publication VARCHAR(250), avatar VARCHAR(250))"
+        - "CREATE TABLE movies (indexes INT PRIMARY KEY AUTO_INCREMENT, title VARCHAR(250), release VARCHAR(250), score INT(11), reviewer VARCHAR(250), publication VARCHAR(250))"
+      register: create_tables_output
+      ignore_errors: yes
+
+    - name: Debug create tables output
+      debug:
+        var: create_tables_output.stdout_lines

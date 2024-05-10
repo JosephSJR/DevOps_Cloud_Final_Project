@@ -1,0 +1,49 @@
+---
+- name: Create schema and tables in RDS instance
+  hosts: backend
+  become: yes
+
+  tasks:
+    - name: Install MySQL client
+      package:
+        name: mysql-client
+        state: present
+
+    - name: Check if database exists
+      shell: |
+        mysql -h mysql-database-qa.crqm4uyeoi50.us-east-1.rds.amazonaws.com -u admin -papplicationuser -e "SHOW DATABASES" | grep -q 'MySQLDB'
+      ignore_errors: yes
+      register: db_exists_result
+
+    - name: Create database if it doesn't exist
+      shell: |
+        mysql -h mysql-database-qa.crqm4uyeoi50.us-east-1.rds.amazonaws.com -u admin -papplicationuser -e "CREATE DATABASE MySQLDB"
+      when: db_exists_result.rc != 0
+
+    - name: Create tables
+      shell: |
+        mysql -h mysql-database-qa.crqm4uyeoi50.us-east-1.rds.amazonaws.com -u admin -papplicationuser -D MySQLDB -e "{{ item }}"
+      loop:
+        - "CREATE TABLE IF NOT EXISTS publications (indexes INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(250), avatar VARCHAR(250))"
+        - "CREATE TABLE IF NOT EXISTS reviewers (indexes INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(250), publication VARCHAR(250), avatar VARCHAR(250))"
+        - "CREATE TABLE IF NOT EXISTS movies (indexes INT PRIMARY KEY AUTO_INCREMENT, title VARCHAR(250), release_date VARCHAR(250), score INT, reviewer VARCHAR(250), publication VARCHAR(250), release_year INT)"
+      register: create_tables_output
+      ignore_errors: yes
+
+    - name: Debug create tables output
+      debug:
+        var: create_tables_output.stdout_lines
+    
+    - name: Install Node.js and npm
+      become: yes
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - nodejs
+        - npm
+
+    - name: Execute seeds.js
+      command: node seeds.js
+      args:
+        chdir: /home/ubuntu

@@ -1,0 +1,62 @@
+---
+- name: Configure bastion/host
+  hosts: bastion-qa
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Update package cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install Ansible
+      ansible.builtin.package:
+        name: ansible
+        state: present  
+        
+    - name: Add desired block of text to /etc/hosts
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        block: |
+          127.0.0.1     localhost
+          54.85.121.209 bastion-host
+          10.0.2.80    frontend
+          10.0.3.155    backend
+          44.203.50.22  nat-instance
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+
+    - name: Add desired block of text to /etc/ansible/hosts
+      ansible.builtin.blockinfile:
+        path: /etc/ansible/hosts
+        create: yes
+        block: |
+          [managed_nodes]
+          bastion-host ansible_host=54.85.121.209
+          frontend ansible_host=10.0.2.80
+          backend ansible_host=10.0.3.155
+          nat-instance ansible_host=44.203.50.22 ansible_user=ec2-user
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+
+    - name: Add desired block of text to ~/.ssh/config
+      ansible.builtin.blockinfile:
+        path: /home/ubuntu/.ssh/config
+        create: yes 
+        block: |
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            User ubuntu
+            IdentityFile ~/.ssh/my-ssh-key.pem
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+        
+    - name: Copy files to instance
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "/home/ubuntu/"
+      with_items:
+        - { src: "/mnt/c/Users/josep/.ssh/my-ssh-key.pem", dest: "/home/ubuntu/.ssh/my-ssh-key.pem" }
+        - { src: "/mnt/c/Users/josep/EPAM/DevOps_Cloud_Final_Project/ansible/bastion-playbooks/frontend-qa.yml", dest: "/home/ubuntu/frontend-qa.yml" }
+        - { src: "/mnt/c/Users/josep/EPAM/DevOps_Cloud_Final_Project/ansible/bastion-playbooks/backend-qa.yml", dest: "/home/ubuntu/backend-qa.yml" }
+        - { src: "/mnt/c/Users/josep/EPAM/DevOps_Cloud_Final_Project/ansible/bastion-playbooks/rds-qa.yml", dest: "/home/ubuntu/rds-qa.yml" }
+      
+
+

@@ -1,0 +1,62 @@
+---
+- name: Configure bastion/host
+  hosts: bastion-production
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Update package cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install Ansible
+      ansible.builtin.package:
+        name: ansible
+        state: present  
+        
+    - name: Add desired block of text to /etc/hosts
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        block: |
+          127.0.0.1     localhost
+          3.87.216.45 bastion-host
+          10.1.2.165    frontend
+          10.1.3.220    backend
+          3.88.196.4  nat-instance
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+
+    - name: Add desired block of text to /etc/ansible/hosts
+      ansible.builtin.blockinfile:
+        path: /etc/ansible/hosts
+        create: yes 
+        block: |
+          [managed_nodes]
+          bastion-host ansible_host=3.87.216.45
+          frontend ansible_host=10.1.2.165
+          backend ansible_host=10.1.3.220
+          nat-instance ansible_host=3.88.196.4 ansible_user=ec2-user
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+
+    - name: Add desired block of text to ~/.ssh/config
+      ansible.builtin.blockinfile:
+        path: /home/ubuntu/.ssh/config
+        create: yes 
+        block: |
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            User ubuntu
+            IdentityFile ~/.ssh/my-ssh-key.pem
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+
+    - name: Copy files to instance
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "/home/ubuntu"
+      with_items:
+        - { src: "/mnt/c/Users/josep/Desktop/EPAM_Tasks/4.Final_Project/Final_Project_App/devops-rampup/movie-analyst-api/seeds.js", dest: "/home/ubuntu/seeds.js" }
+        - { src: "/mnt/c/Users/josep/.ssh/my-ssh-key.pem", dest: "/home/ubuntu/.ssh/my-ssh-key.pem" }
+        - { src: "/mnt/c/Users/josep/EPAM/DevOps_Cloud_Final_Project/ansible/bastion-playbooks/frontend-production.yml", dest: "/home/ubuntu/frontend-production.yml" }
+        - { src: "/mnt/c/Users/josep/EPAM/DevOps_Cloud_Final_Project/ansible/bastion-playbooks/backend-production.yml", dest: "/home/ubuntu/backend-production.yml" }
+        - { src: "/mnt/c/Users/josep/EPAM/DevOps_Cloud_Final_Project/ansible/bastion-playbooks/rds-production.yml", dest: "/home/ubuntu/rds-production.yml" }
+    
+        
